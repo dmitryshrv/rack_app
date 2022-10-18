@@ -3,39 +3,41 @@ require_relative '../service/time_service'
 class TimMiddleware
   def initialize(app)
     @app = app
-    @status = 200
   end
 
   def call(env)
     @request = Rack::Request.new(env)
-    @formats = @request.params["format"]
-    check_path
-    @response = Rack::Response.new(time, @status, headers)
-    @response.finish
+
+    if valid_path?
+      show_time
+    else
+      response("Path is not valid", 404, headers)
+    end
   end
+
 end
 
-def check_path
-  if @request.path == '/time'
-    @status = 200
-  else
-    @status = 404
-  end
+def valid_path?
+  @request.path == '/time'
+end
+
+def response(body, status, headers)
+  Rack::Response.new(body, status, headers).finish
 end
 
 def headers
   {'Content-type' => 'plain/text'}
 end
 
-def time
+def show_time
   time = Time.now
-  time_format = TimeService.new(time, @formats)
+  formats = @request.params["format"]
+  time_format = TimeService.new(time, formats)
   time_format.call
 
   if time_format.valid_format?
-    time_format.result
+    response(time_format.result, 200, headers)
   else
-    @status = 400
-    "Unknown format #{time_format.unkown_formats}"
+    response("Unknown time format #{time_format.unknown_formats}\n", 400, headers)
   end
 end
